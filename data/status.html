@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html><head>
+<title>PSU fan status</title>
+<link rel="stylesheet" type="text/css" href="css/table-column-options.css"/>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+
+<script>
+$(document).ready(function(){
+    $("#on").click(function(){
+        $.post("fanon");
+    });
+});
+$(document).ready(function(){
+    $("#off").click(function(){
+        $.post("fanoff");
+    });
+});
+</script>
+
+<script type="text/javascript">
+//check for browser support
+if(typeof(EventSource)!=="undefined") {
+	//create an object, passing it the name and location of the server side script
+	var eSource = new EventSource("updates");
+
+eSource.addEventListener('temp', function(e) {
+  document.getElementById("temp").innerHTML = e.data;
+}, false);
+
+eSource.addEventListener('fan', function(e) {
+  document.getElementById("fan").innerHTML = e.data;
+}, false);
+
+eSource.addEventListener('fanbtn', function(e) {
+if(e.data == "1")
+    {
+        $('#on').prop('checked', true);
+        $("#buttons").buttonset("refresh");
+    }
+  else
+    {
+    $('#off').prop('checked', true);
+    $("#buttons").buttonset("refresh");
+    }
+}, false);
+}
+else {
+	alert("Whoops! Your browser doesn't receive server-sent events\n Try using Google Chrome.");
+}
+</script>
+</head>
+
+<body>
+<br>
+<table class="column-options center" style="width:490px;">
+<tr><th colspan="2">&nbsp;&nbsp;PSU fan status&nbsp;&nbsp;</th>
+</tr>
+  <tr class="odd">
+    <td>PSU temperature</td>
+    <td>
+    <span id='temp'>...</span><br>
+    </td>
+  </tr>
+  <tr>
+    <td>Fan state</td>
+    <td>
+    <span id='fan'>...</span>
+    </td>
+  </tr>
+  <tr class="odd">
+    <td colspan="2">
+    <div id="buttons">
+      <input type="radio" name="manual" id="on">
+      <label for="on">Manual</label>
+      <input type="radio" name="manual" id="off" checked="checked">
+      <label for="off">Auto</label>
+      <a href="setup">Setup</a>
+    </div>
+    </td>
+  </tr>
+</table>
+<br>
+<br>
+<script>
+$( "#buttons" ).buttonset();
+</script>
+</body>
+</html>

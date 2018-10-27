@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html><head>
+<title>PSU fan setup</title>
+<link rel="stylesheet" type="text/css" href="css/table-column-options.css"/>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/themes/smoothness/jquery-ui.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
+
+<script>
+$(document).ready(function(){
+    $("#save-conf").click(function(){
+      var dOn=$("#dOn").val();
+      var dOff=$("#dOff").val();
+
+      $.post("save",{i:dOn,c:dOff});
+    });
+});
+
+function getsettings(){
+var request = new XMLHttpRequest();
+request.onreadystatechange = function(){if (this.readyState == 4) {if (this.status == 200) {
+if (this.responseXML != null) {
+  $("#dOn").val(this.responseXML.getElementsByTagName('dOn')[0].childNodes[0].nodeValue);
+  $("#dOff").val(this.responseXML.getElementsByTagName('dOff')[0].childNodes[0].nodeValue);
+}}}}
+request.open('GET', 'settings', true);
+request.send(null);
+}
+</script>
+</head>
+
+<body onload='getsettings()'>
+<br>
+<table class="column-options center">
+<tr><th>Setting</th><th>Value</th>
+</tr>
+  <tr>
+    <td>Fan on</td>
+    <td>
+    <input type="text" maxlength="2" name="dOn" id="dOn" onkeypress='return event.charCode >= 48 && event.charCode <= 57'></input>
+    </td>
+  </tr>
+  <tr class="odd">
+    <td>Fan off</td>
+    <td>
+    <input type="text" maxlength="2" name="dOff" id="dOff" onkeypress='return event.charCode >= 48 && event.charCode <= 57'></input>
+    </td>
+  </tr>
+  <tr>
+  <td><button id="save-conf">Save</button></td>
+  <td><a class="button" href="status">Status</a></td>
+  </tr>
+</table>
+</body>
+</html>

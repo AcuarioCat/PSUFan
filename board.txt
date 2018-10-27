@@ -1,0 +1,6 @@
+# PSUFan build property overrides
+#
+# local project board.txt overrides
+network.password=j3ss1camPSU
+network.auth_upload=yes
+network.port=8266
