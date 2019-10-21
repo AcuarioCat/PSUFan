@@ -8,48 +8,66 @@
 <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.4/jquery-ui.min.js"></script>
 
 <script>
-$(document).ready(function(){
-    $("#on").click(function(){
-        $.post("fanon");
-    });
-});
-$(document).ready(function(){
-    $("#off").click(function(){
-        $.post("fanoff");
-    });
-});
-</script>
-
-<script type="text/javascript">
-//check for browser support
-if(typeof(EventSource)!=="undefined") {
-	//create an object, passing it the name and location of the server side script
-	var eSource = new EventSource("updates");
-
-eSource.addEventListener('temp', function(e) {
-  document.getElementById("temp").innerHTML = e.data;
-}, false);
-
-eSource.addEventListener('fan', function(e) {
-  document.getElementById("fan").innerHTML = e.data;
-}, false);
-
-eSource.addEventListener('fanbtn', function(e) {
-if(e.data == "1")
+var host = location.hostname;
+function WebSocketConnect()
+{
+    if ("WebSocket" in window)
     {
-        $('#on').prop('checked', true);
-        $("#buttons").buttonset("refresh");
+        // Let us open a web socket
+       var ws = new WebSocket("ws://" + host + "/ws");
+       ws.onopen = function()
+       {
+            setTimeout(function() {$.get("refresh");}, 500);
+       };
+       ws.onerror = function(event)
+       {
+	         console.log("Socket error");
+       };
+       ws.onclose = function(event)
+       {
+	        console.log("Socket closed, reason:"+ event.code);
+            console.log(event);
+            setTimeout(function() {WebSocketConnect();}, 1000);
+       };
+       ws.onmessage = function (evt)
+       {
+          if (typeof evt.data === "string")
+          {
+            onValueMessage(evt.data);
+          }
+       };
     }
-  else
+    else
     {
-    $('#off').prop('checked', true);
-    $("#buttons").buttonset("refresh");
+       alert("WebSocket NOT supported by your Browser!");
     }
-}, false);
-}
-else {
-	alert("Whoops! Your browser doesn't receive server-sent events\n Try using Google Chrome.");
-}
+ }
+function onValueMessage(msg) {
+  if (msg.includes("{")) {
+      var obj = JSON.parse(msg);
+      $("#temp").html(obj.temp);
+      $("#fan").html(obj.fan);
+      /*
+      if(obj.fanbtn == "1")
+      {
+          $('#on').prop('checked', true);
+          $("#buttons").buttonset("refresh");
+      }
+      else
+      {
+          $('#off').prop('checked', true);
+          $("#buttons").buttonset("refresh");
+      }
+      */
+    }
+  }
+
+$(document).ready(function(){
+    $("#on").click(function(){$.post("fanon");});
+    $("#off").click(function(){$.post("fanoff");});
+    WebSocketConnect();
+});
+
 </script>
 </head>
 
@@ -65,7 +83,7 @@ else {
     </td>
   </tr>
   <tr>
-    <td>Fan state</td>
+    <td>Fan speed</td>
     <td>
     <span id='fan'>...</span>
     </td>

@@ -1,12 +1,75 @@
 // For project PSUFan
 //
+#include <ESP8266SSDP.h>
+#include <StreamString.h>
+#include <ArduinoJson.h>
 #include "AsyncWebServer.h"
 
-AsyncWebServer server(8081);
-AsyncEventSource debugEvent("/debugMsg"); // event source (Server-Sent events)
-AsyncEventSource events("/updates"); // event source (Server-Sent events)
+//SSDP properties
+constexpr auto modelName = "PSU Fan control";
+constexpr auto friendlyName = "PSU Fan control";
+constexpr auto modelNumber = "";
 
-AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
+AsyncWebSocket wsd("/wsd");
+
+extern bool manual;
+
+/////////////////////////////////////  SSDP network discovery //////////////////////////////////////
+void setupSSDP() {
+	SSDP.setSchemaURL("description.xml");
+	SSDP.setHTTPPort(80);
+	SSDP.setDeviceType("upnp:rootdevice");
+	SSDP.setModelName(modelName);
+	SSDP.setModelNumber(modelNumber);
+	SSDP.begin();
+
+	server.on("/description.xml", HTTP_GET, [](AsyncWebServerRequest* request) {
+		char hostName[25] = "PSU Fan control";
+		char buf[7];
+
+		StreamString output;
+		if (output.reserve(1024)) {
+			IPAddress ip = WiFi.localIP();
+			uint32_t chipId = ESP.getChipId();
+			output.printf(ssdpTemplate,
+				ip[0], ip[1], ip[2], ip[3],
+				hostName,
+				ip[0], ip[1], ip[2], ip[3],
+				chipId,
+				modelName,
+				modelNumber,
+				(uint8_t)((chipId >> 16) & 0xff),
+				(uint8_t)((chipId >> 8) & 0xff),
+				(uint8_t)chipId & 0xff
+			);
+			request->send(200, "text/xml", (String)output);
+		}
+		else {
+			request->send(500);
+		}
+		});
+}
+
+//Return a string with the system parameters as a json encapsulated in a function for processing on the browser
+extern int fanSpeed;
+extern int temperature;
+extern bool fanState;
+void sendSettings() {
+	const size_t capacity = JSON_OBJECT_SIZE(20);
+	DynamicJsonDocument root(capacity);
+
+	// Add values in the object
+	root["temp"] = temperature;
+	root["fan"] = fanSpeed;
+	root["fanbtn"] = fanState;
+
+	String jsonString;
+	serializeJson(root, jsonString);
+	ws.textAll(jsonString);
+}
+
 
 void onRequest(AsyncWebServerRequest *request) {
 	//Handle Unknown Request
@@ -26,12 +89,29 @@ void onEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventTyp
 }
 
 void setupWebserver() {
-	// attach AsyncWebSocket
-	ws.onEvent(onEvent);
+	// Start and init debug winsocket
+	ws.onEvent([](AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len)
+		{
+			Serial.printf("wsd event: %d\n", type);
+			if (type == WS_EVT_CONNECT)
+			{
+				//Serial.printf("wsd[%s][%u] connected\n", server->url(), client->id());
+				client->ping();
+			}
+		});
 	server.addHandler(&ws);
 
-	// attach AsyncEventSource
-	server.addHandler(&events);
+	// Start and init debug winsocket
+	wsd.onEvent([](AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len)
+		{
+			//Serial.printf("wsd event: %d\n", type);
+			if (type == WS_EVT_CONNECT)
+			{
+				//Serial.printf("wsd[%s][%u] connected\n", server->url(), client->id());
+				client->ping();
+			}
+		});
+	server.addHandler(&wsd);
 
 	server.on("/devReboot", HTTP_GET, [](AsyncWebServerRequest *request) {
 		request->send(200, "text/plain", "Rebooting...");
@@ -52,9 +132,14 @@ void setupWebserver() {
 		request->send(SPIFFS, "/status.html");
 	});
 
-	server.on("/setup", HTTP_GET, [](AsyncWebServerRequest *request) {
+	server.on("/setup", HTTP_GET, [](AsyncWebServerRequest* request) {
 		request->send(SPIFFS, "/setup.html");
-	});
+		});
+
+	server.on("/refresh", HTTP_GET, [](AsyncWebServerRequest* request) {
+		sendSettings();
+		request->send(200);
+		});
 
 	server.on("/settings", HTTP_GET, [](AsyncWebServerRequest *request) {
 		DEBUG_PRINTLN("settings");
@@ -78,12 +163,14 @@ void setupWebserver() {
 
 		DEBUG_PRINTLN("Fan on");
 		turnFan(1023);
+		manual = true;
 		request->send(200, "text/html", "Fan on");
 	});
 
 	server.on("/fanoff", HTTP_POST, [](AsyncWebServerRequest *request) {
 
 		DEBUG_PRINTLN("Fan off");
+		manual = false;
 		turnFan(0);
 		request->send(200, "text/html", "Fan off");
 	});
@@ -96,15 +183,23 @@ void setupWebserver() {
 	server.onNotFound(onRequest);
 	server.onFileUpload(onUpload);
 	server.onRequestBody(onBody);
-
+	setupSSDP();
 	server.begin();
+	Serial.println("Server setup");
+}
+
+void sendWsMessage(String message, String key) {
+	String jsonString;
+	// Add values in the object
+	const size_t capacity = JSON_OBJECT_SIZE(4);
+	DynamicJsonDocument root(capacity);
+	root[key] = message;
+	serializeJson(root, jsonString);
+	ws.textAll(jsonString);
 }
 
 void setupOTAUpdate(void)
 {
-	// Hostname defaults to esp8266-[ChipID]
-	// ArduinoOTA.setHostname("myesp8266");
-
 	// Authentication password
 	ArduinoOTA.setPassword(otaPassword);
 

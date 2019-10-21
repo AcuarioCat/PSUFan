@@ -2,16 +2,18 @@
     Name:       PSUFan.ino
     Created:	21/10/2018 11:10:19
     Author:     Nigel Morton
+	V2.0 21-Oct-19 Update to websocket and port 80 instead of 8081. Also add ssdp.
+
+	NOTE: !!! USE GENERIC ESP8266 AS 1Mb NOT 4Mb
 */
 #include "PSUFan.h"
 #include "eeprom_util.h"
 #include "WiFiSettings.h"
 
-const char* version = "V1.0";
+const char* version = "V2.0";
 
-DebugWeb debugWeb;
 Ticker tmrReadSensor;
-extern AsyncEventSource events; // event source (Server-Sent events)
+extern AsyncWebSocket ws; // 
 bool shouldReboot = false;
 bool fanState = false;
 int fanSpeed;
@@ -33,10 +35,9 @@ void setup()
 
 	Serial.begin(115200);
 	turnFan(FAN_OFF);
-	pinMode(FAN, OUTPUT);      // sets the digital pin as output
-
 	DEBUG_PRINTLN("");
 	DEBUG_PRINTLN("Startup");
+	pinMode(FAN, OUTPUT);      // sets the digital pin as output
 
 	WiFi.mode(WIFI_STA);	//WIFI_STA
 	WiFi.hostname(hostName);
@@ -64,6 +65,7 @@ void setup()
 	//Start timers for system functions
 	tmrReadSensor.attach(5, readSensor);		//Start timer to kick off sensor reading
 	analogWriteFreq(2000);
+	turnFan(250);
 }
 
 // Main loop() function
@@ -76,8 +78,7 @@ void loop()
 	if (bReadSensor) {
 		readADCSensor();
 		bReadSensor = false;
-		sprintf(status, "%d", temperature);
-		events.send(status, "temp");
+		sendSettings();
 		//if ((temperature >= fanOnTemp) && (!fanState))
 		if (temperature >= fanOnTemp)
 			{
@@ -118,21 +119,21 @@ void loop()
 
 //Turn fan on/off (pwm)
 void turnFan(int fSpeed) {
-	char status[20];
 
-	DEBUG_PRINTLN("turnFan");
+	if (manual)
+		return;
+	DEBUG_PRINTF("turnFan:%d\n", fSpeed);
 	analogWrite(FAN, fSpeed);
 	fanSpeed = fSpeed;
 	fanState = fSpeed == 0 ? false : true;
-	sprintf(status, "%d", fSpeed);
-	events.send(status, "fan");
+	sendSettings();
 }
 
 void readADCSensor() {
 	//Read from ESP analogue pin
 	adc = 1024 - analogRead(A0);
 	temperature = convertToTemperature(adc, 1024.0);
-	DEBUG_PRINTST("Raw %d: %d\n", adc , temperature);
+	DEBUG_PRINTF("Raw %d: %d\n", adc , temperature);
 }
 
 #define RESISTANCE 10000
