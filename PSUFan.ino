@@ -2,7 +2,8 @@
     Name:       PSUFan.ino
     Created:	21/10/2018 11:10:19
     Author:     Nigel Morton
-	V2.0 21-Oct-19 Update to websocket and port 80 instead of 8081. Also add ssdp.
+	V2.0 21-Oct-19 Update to websocket and port 80 instead of 8081. Also add ssdp. 
+	Test comment
 
 	NOTE: !!! USE GENERIC ESP8266 AS 1Mb NOT 4Mb
 */
